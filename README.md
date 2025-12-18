@@ -20,6 +20,7 @@ I have uploaded five csvs of data that I downloaded from the trial data shared w
 
 ### Analysis Write Up
 **Analysis Qs.docx** is the written deliverable for the take home assessment. This document includes market insights, agent insights (and ranking table) and the process write up. 
+
 **best_agents2.csv** is a csv format of the best agents by market table that is in the Analysis document, in case you want a cleaner view of it. I uploaded it separately because it's annoying to look at a 50 row table in a word document.
 ### Analysis Script
 I used R via RStudio to analyze the data. I have included the RMarkdown script as **cleverassessment.Rmd**. The script includes a base set of common packages that I like to automatically include in all my scripts. There are also notations from me documenting my process and explaining the purpose of the code chunks. 
