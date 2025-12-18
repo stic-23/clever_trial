@@ -1,0 +1,255 @@
+---
+title: "Take Home Assignment"
+author: "clh"
+date: "2025-12-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#setting up package library
+```{r library}
+library("tidyverse")
+library("dplyr")
+library("tidyr")
+library("stringr")
+library("lubridate")
+library("data.table")
+```
+
+#loading in datasets
+```{r importdata}
+sales <-read.csv("sales.csv")
+calls <- read.csv("calls.csv")
+agents <- read.csv("agents.csv")
+customers <-read.csv("customers.csv")
+markets <- read.csv("markets.csv")
+```
+
+#checking the format of the data and checking it against the README
+```{r glimpse}
+glimpse(sales)
+glimpse(calls)
+glimpse(agents)
+glimpse(customers)
+glimpse(markets)
+
+```
+
+#Some cleaning work. Converting characters to integers to make summarizing sales amounts possible. I'm going to combine the "sales" data, which provides the customer_id and the amount of the sale, with the "customers" data so that I can match the customer with their market. Also, checking for an outlier (that I know exsists from poking around the datatables).
+```{r prework}
+
+#michael_lewis_922's market id is incorrectly listed as "orlando_fla" instead of "orlando_fl" like her peers.
+agents$market_id <- str_replace(agents$market_id, "orlando_fla", "orlando_fl")
+
+#converting prices to integer
+sales$amount <- as.integer(str_remove_all(sales$amount, "[$,]"))
+markets$price_closed_median <- markets$price_closed_median <- as.integer(str_remove_all(markets$price_closed_median, "[$,]"))
+
+#combining customers with respective markets and creating a field that calculates our 1% take of each sale
+sales_by_market <- sales %>% select(customer_id,sale_id,amount)
+sales_by_market <- left_join(sales_by_market,customers, join_by(customer_id))
+sales_by_market$earnings <- sales_by_market$amount*.01
+
+#checking for outliers in sales
+outliers <- ggplot(sales_by_market) +
+  aes(x = "", y = amount) +
+  geom_boxplot(fill = "#289de2") +
+  theme_minimal()
+outliers
+
+#woah baby that looks crazy! Lets remove sale_id 3458.
+
+sales_by_market <- sales_by_market %>% 
+  filter(sale_id != 3458)
+
+#and check the boxplot again
+outliers <- ggplot(sales_by_market) +
+  aes(x = "", y = amount) +
+  geom_boxplot(fill = "#289de2") +
+  theme_minimal()
+outliers
+
+#much nicer. Now we have a cleaner dataset to work with.
+
+```
+
+
+#Part One: Markets
+#We will begin with some basic descriptive statistics looking at the markets with the most sales, the highest revenues, and where we have a higher market share.
+#To do this analysis, I need to make sure that I'm only looking at deals that we made. .
+
+```{r marketinsights}
+
+#summarizing some insights from our sales data
+market_facts <- sales_by_market %>% 
+  group_by(market_id) %>% 
+  summarise(our_sales = n(),
+            our_sale_median = median(amount),
+            our_earnings =sum(earnings),
+            commission_median = median(earnings))
+
+#summarizing some insights from our agent data
+
+market_facts <- left_join(market_facts, (agents %>% group_by(market_id) %>%  summarise(num_agents = n())), join_by(market_id))
+
+
+#comparing our sales data to the overall market picture
+market_facts <- market_facts %>% 
+  left_join(select(markets,listings_closed_count, market_id, price_closed_median), by = "market_id")
+
+market_facts$market_share <- market_facts$our_sales/market_facts$listings_closed_count
+market_facts$price_difference <- market_facts$our_sale_median - market_facts$price_closed_median
+market_facts$earn_per_agent <- market_facts$our_earnings/market_facts$num_agents
+
+
+```
+
+#Part Two: Agents
+#We want to find the best agent in each market.I'm going to explore the data to decide which metric I want to use to rank. There are a lot of different ways to evaluate performance, like with markets, but since we are comparing agents within each market, across fifty markets, I want to be consistent. Plus, I want to poke around to see if I can identify any interesting correlations in the data that indicate successful agents. 
+
+
+```{r corrtest1}
+#My first thought is to look at the agent's average rating. But, I want to drill deeper to see what exactly might be influencing that rating. 
+#My theory is that a higher ratio of referrals-to-closes is going to be correlated with a higher agent rating. 
+
+#find the conversion ratio of customers sent to closes made.
+agents$total_sent <- agents$buyer_customers_sent_2024 + agents$seller_customers_sent_2024
+agents$total_closed <- agents$buyer_closes_2024 + agents$seller_closes_2024
+agents$close_ratio <- agents$total_closed/agents$total_sent
+
+ratio_graph <- ggplot(agents, aes(x=close_ratio, y=avg_rating_2024)) + 
+    geom_point()
+ratio_graph
+
+#well that doesn't look good. 
+
+correlation = cor.test(agents$close_ratio, agents$avg_rating_2024, method = "pearson")
+correlation
+#Yup, there is no relationship here. Well, a failed test still illustrates a point. 
+
+```
+
+#For my next theory, I want to look at the relationship between the average number of calls that each agent sees per customer, and their close rate. My logic is that the calls will say something about the agent's ability to build a relationship with the client and convert that relationship to a sale. 
+```{r callsandcloses}
+
+#adding a field in the customers set that counts the  number of call each customer made
+customer_pocs <- calls %>% 
+  group_by(customer_id) %>% 
+  summarise(num_calls = n())
+
+customers <- left_join(customers, select(customer_pocs, customer_id, num_calls), join_by(customer_id))
+
+#creating a field that indicates if the customer who called went through with a sale. 1 = Yes, 0 = No
+customers <- left_join(customers, sales, join_by(customer_id))
+customers$sale_made <- ifelse(customers$sale_id > 0, 1, 0)
+customers$sale_made[is.na(customers$sale_made)] = 0
+
+#lets look for a relationship between the number of calls made and if the sale was closed. 
+calls_and_close <- glm(sale_made ~ num_calls, data = customers, family = "binomial")
+summary(calls_and_close)
+
+#Another valuable insight through a failure: there is no significant relationship between the number of calls a customer makes and if the sale closes. Therefore, I'm going to stop trying to use it as a metric for agent performance. 
+#Admittedly, this was a bit of a statistical tangent to satisfy my own curiosity about relationships between indicators. Plus, its not everyday that you get to whip out a binary regression!
+
+```
+
+#As the assignment says, don't overthink it. I'm going to focus in on some simpler metrics to evaluate agent performance on. I will recycle some of the metrics we used to analyze the best markets. I will look at the most sales, the most total revenue, highest median sale price, highest average rating, and best referal to sales ratio. 
+
+```{r topagents}
+agents$fullname <- paste(agents$first_name, agents$last_name, sep = " ")
+#created a field for the full name of the agent, but due to duplicate names I'm going to leave it as the id
+
+agents <- left_join(agents, (sales_by_market %>% 
+  group_by(assigned_agent) %>% 
+  summarise(total_earnings= sum(earnings), median_price = median(amount))), join_by(agent_id == assigned_agent))
+
+top_agents <- select(agents, agent_id, market_id, total_closed) %>%
+  rename(top_closer = agent_id) %>% 
+  group_by(market_id) %>% 
+  top_n(1,total_closed)
+
+top_agents <- left_join(top_agents, select(agents, agent_id, market_id, total_earnings) %>%
+  rename(top_earner = agent_id) %>% 
+  group_by(market_id) %>% 
+  top_n(1,total_earnings)) 
+
+top_agents <- left_join(top_agents, select(agents, agent_id, market_id, median_price) %>%
+  rename(top_median_seller = agent_id) %>% 
+  group_by(market_id) %>% 
+  top_n(1,median_price)) 
+
+top_agents <- left_join(top_agents, select(agents, agent_id, market_id, avg_rating_2024) %>%
+  rename(top_rated = agent_id, rating = avg_rating_2024) %>% 
+  group_by(market_id) %>% 
+  top_n(1,rating))
+
+top_agents <- left_join(top_agents, select(agents, agent_id, market_id, close_ratio) %>%
+  rename(top_ratio = agent_id) %>% 
+  group_by(market_id) %>% 
+  top_n(1,close_ratio))
+
+top_agents <- top_agents[, c(2,1,3,4,5,6,7,8,9,10,11)]
+
+setnames(top_agents, old = c("market_id","top_closer","total_closed","top_earner", "total_earnings","top_median_seller" ,"median_price", "top_rated" , "rating","top_ratio", "close_ratio"), 
+         new = c("Market ID","Top Closer","Total Closed","Top Earner", "Total Earned","Top Median Sale Price" ,"Median Sale Price", "Top Rated" , "Average Rating","Top Conversion Ratio", "Conversion Ratio"))
+
+#write.csv(top_agents,"C:/Users/clara/OneDrive/Desktop/top_agents.csv")
+
+#I now have a set of five different metrics to evaluate agents on. There are some ties, and it doesn't provide a definitive answer to the one best agent in each market. 
+
+
+```
+
+#We can see a top agent in categories in each market, which is useful, but actually, I'm going to dive back into the full list of agents and do some rank normalization to combine all these metrics. I'll weight each category as a one, for simplicity. 
+#Normally, I would do a ranking like this in Google Sheets so that it's more interactive and visual, but I'm going to do it here for the sake of keeping everything in one place. I've never actually done rank normalization in R, so this will be a fun exploration for me. 
+
+```{r ranking}
+# we will be ranking based on "avg_rating 2024", "close_ratio", "total_earnings", "median_price", "total_closed")
+
+agent_rankings <- select(agents, agent_id, market_id, fullname, avg_rating_2024, close_ratio, total_earnings, median_price, total_closed)
+
+
+agent_rankings$ratio_score <- (agent_rankings$close_ratio - min(agent_rankings$close_ratio)) / (max(agent_rankings$close_ratio) - min(agent_rankings$close_ratio))
+
+agent_rankings$earnings_score <- (agent_rankings$total_earnings - min(agent_rankings$total_earnings)) / (max(agent_rankings$total_earnings) - min(agent_rankings$total_earnings))
+
+agent_rankings$prices_score <- (agent_rankings$median_price - min(agent_rankings$median_price)) / (max(agent_rankings$median_price) - min(agent_rankings$median_price))
+
+agent_rankings$closed_score <- (agent_rankings$total_closed - min(agent_rankings$total_closed)) / (max(agent_rankings$total_closed) - min(agent_rankings$total_closed))
+
+
+#we have an NA in the average ratings. asha_smith_149 and thomas_ramirez_900 do not have average ratings for 2024. I'm going to do a little bypass manuever.  
+
+agent_rankings_sub <- agent_rankings %>% 
+  filter(!is.na(avg_rating_2024))
+
+agent_rankings_sub$rating_score <-(agent_rankings_sub$avg_rating_2024 - min(agent_rankings_sub$avg_rating_2024)) / (max(agent_rankings_sub$avg_rating_2024) - min(agent_rankings_sub$avg_rating_2024))
+
+agent_rankings <- left_join(agent_rankings, select(agent_rankings_sub, agent_id, rating_score))
+remove(agent_rankings_sub)
+
+agent_rankings$rating_score[is.na(agent_rankings$rating_score)] <- 0
+
+agent_rankings$sum_score <-  agent_rankings$ratio_score + agent_rankings$earnings_score + agent_rankings$prices_score + agent_rankings$closed_score + agent_rankings$rating_score
+
+agent_rankings$final_score <- (agent_rankings$sum_score - min(agent_rankings$sum_score)) / (max(agent_rankings$sum_score) - min(agent_rankings$sum_score))
+
+best_agents_by_market <- agent_rankings %>%
+  group_by(market_id) %>% 
+  top_n(1,final_score)
+
+best_agents_by_market <- best_agents_by_market[, c(2,1,3,4,13,5,9,6,10,7,11,8,12,14,15)]
+
+write.csv(best_agents_by_market,"C:/Users/clara/OneDrive/Desktop/best_agents2.csv")
+
+```
+
+
+
+
+
+
+

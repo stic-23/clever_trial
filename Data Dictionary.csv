@@ -1,0 +1,66 @@
+"This spreadsheet contains data on 50,000 ""customers"" (not real people) who contacted Smiley Real Estate for the first time in 2025, starting on January 1.",
+This data is shared in five tabs:,
+"customers lists basic information about each customer - a unique ID, name, address, etc.",
+calls indicates the times at which each customer called the company and the outcome of that call,
+"sales indicates the time of a successful sale, identifying the CustomerID, the time of the sale, and the value of the property sold",
+agents provides information on real estate agents in our network,
+markets provides information on the fifty markets served by our company,
+,
+The quantity of data in this Google Sheet may make it difficult to do analysis directly in Google Sheets.  Consider using other tools.,
+Some free tools that may help include:,
+MySQL - https://www.mysql.com,
+Python - https://www.python.org,
+LibreOffice - https://www.libreoffice.org/,
+"Use tools that you are comfortable with!  Just make sure to let us know what tools you used and, most importantly, the process you followed.  Share your working files and scripts with us!",
+,
+DATA DICTIONARY,
+,
+sales,"Again, this tab indicates the time of a successful sale, identifying the customer_id, the time of the sale, and the value of the property sold"
+sale_id,A unique identifier for each sale
+customer_id,The unique ID of the customer
+sale_date,The date of the sale
+amount,"The amount for which the house sold.  Whenever a house sells, the selling agent earns 2% of the home's value, and Smiley Real Estate earns 1% of the home's value"
+,
+calls,"Again, this tab indicates the times at which each customer called the company and the outcome of that call"
+call_id,The unique ID of the call
+customer_id,The customer that called us
+call_date,The date of the call
+disposition,What the call was like.  Voicemail means the call went to voicemail.  Disconnected means one party on the line hung up before any conversation occurred.  Talked to Customer means that the call_handler had a conversation with the customer
+call_handler,The first name of the person who handled the customer call
+,
+agents,"Again, this tab describes the agents that work for Smiley Real Estate, and their 2024 stats"
+agent_id,The unique id of the agent
+first_name,The agent's first name
+last_name,The agent's last name
+market_id,The market_id served by this agent
+buyer_customers_sent_2024,The number of buyer customers sent to this agent in 2024
+seller_customers_sent_2024,The number of seller customers sent to this agent in 2024
+buyer_closes_2024,"The number of buyer customers sent to this agent in 2024 that resulted in a closed deal.  Remember, Smiley Real Estate wants closed sales; that's how we make money!"
+seller_closes_2024,"The number of seller customers sent to this agent in 2024 that resulted in a closed deal.  Remember, Smiley Real Estate wants closed sales; that's how we make money!"
+customer_reviews_2024,The number of customer reviews of this agent in 2024
+avg_rating_2024,The average rating of those customer reviews of this agent in 2024
+,
+customers,"Again, this tab lists basic information about each customer - a unique ID, name, address, etc."
+customer_id,Unique customer ID
+created_at,The date this customer first signed up to be a customer of Smiley Real Estate
+first_name,First name of the customer
+last_name,Last name of the customer
+address,The address of the customer
+city,The city of the customer
+state,The state of the customer
+zip_code,The zip code of the customer
+market_id,"The market in which this customer lives.  To assign customers to agents, we pick an agent (below) that has the same market_id as the customer."
+assigned_agent,The agent_id for the assigned agent
+,
+markets,"Again, this is basic information about the 50 markets that Smiley Real Estate serves"
+market_id,A unique ID for the market
+census_name,"The Census name for the market.  Generally, Smiley Real Estate defines a market as being equivalent to a Census metropolitan area."
+common_name,The common name for this market
+population,The total population for this market
+days_on_market_median,The number of days that a home listed for sale that actually sells takes to sell in this market.  A lower days_on_market means that homes are moving fast; a higher value means it takes longer to sell.
+price_new_list_median,The median price of homes listed for sale in this market when they are initially listed
+price_closed_median,The median price of what homes actually sell for in this market
+listings_on_market_count,The number of listings for sale in this market
+listings_price_increase_count,The number of listings that saw a price increase in the last 30 days in this market
+listings_price_decrease_count,The number of listings that saw a price decrease in the last 30 days in this market
+listings_closed_count,The number of listings that sold/closed in the last 30 days in this market
