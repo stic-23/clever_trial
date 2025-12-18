@@ -1,5 +1,6 @@
 # clever_trial
-Repository containing data analyst trial assessment for Clever
+Repository containing data analyst trial assessment for Clever.
+
 I have uploaded code and files in this repository, with descriptions outlined below. 
 
 ### Data
